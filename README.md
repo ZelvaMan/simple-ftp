@@ -115,3 +115,4 @@ Second digit:
 
 - [rfc 959](https://datatracker.ietf.org/doc/html/rfc959)
 - [LIST Response format](https://stackoverflow.com/questions/4564603/format-of-the-data-returned-by-the-ftp-list-command)
+- [LIST response format to use](https://stackoverflow.com/questions/2443007/ftp-list-format)
