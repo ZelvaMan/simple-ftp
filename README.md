@@ -31,6 +31,10 @@ When server receives the transfer command it opens the connection
 and sends confirming reply. Server is responsible for managing connection.
  `PORT` command is used to specify DTP and it forces reconnecting of DTC.
 
+Controll connection is opened from client to port `21`.
+After `PASV` command part of response is port to which client should connect.
+Server maybe returns unique port for each connected client?
+
 ### Data Transfer
 
 client specifies the type. Default file structure is `FILE`.
@@ -83,6 +87,8 @@ client specifies the type. Default file structure is `FILE`.
     - S = Stream
     - B = Block
     - C = Compressed
+- `LIST [Directory]`
+  - format is not specified (user ls)
 
 ### Replies
 
@@ -93,22 +99,47 @@ client specifies the type. Default file structure is `FILE`.
 
 First digit:
 
-- `1XY` Positive Preliminary reply
+- `1xy` Positive Preliminary reply
   - command was accepted, but no complete
   - at most one per command
 
-- `2XY` Positive Completion reply
+- `2xy` Positive Completion reply
   - command completed succesfully
 
-- `3XY` Positive Intermediate reply
+- `3xy` Positive Intermediate reply
   - waiting for another command
   - used in command sequences
 
-- `4XY` Transient Negative Completion reply
+- `4xy` Transient Negative Completion reply
+  - non-pernament -> retrie later
 
-- `5XY` 
+- `5xy` Permanent Negative Completion reply
+  - pernament -> dontr retry
 
 Second digit:
+- `x0z` Syntax
+  - also for not implemented stuff
+- `x1z` Information
+  - replies to requests for informations
+- `x2z` Connections
+- `x3z` Authentication and accounting
+  - used in auth flow
+- `x5z` File system
+  - stuff like file not found etc.
+
+### Minimum implementation
+
+```text
+TYPE - ASCII Non-print
+         MODE - Stream
+         STRUCTURE - File, Record
+         COMMANDS - USER, QUIT, PORT,
+                    TYPE, MODE, STRU,
+                      for the default values
+                    RETR, STOR,
+                    NOOP.
+```
+
 
 
 ## Knowledge sources
