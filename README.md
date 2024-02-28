@@ -35,6 +35,13 @@ Controll connection is opened from client to port `21`.
 After `PASV` command part of response is port to which client should connect.
 Server maybe returns unique port for each connected client?
 
+**How does server paid DTC A control connection**?
+
+- one way it to make each DTP unique
+  - doesnt work behind nat
+  - simplest to implement 
+- other is to assume 1 client per ip addr
+
 ### Data Transfer
 
 client specifies the type. Default file structure is `FILE`.
