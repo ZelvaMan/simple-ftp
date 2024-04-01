@@ -8,7 +8,6 @@ import (
 
 type FtpServer struct {
 	controlConnectionListener net.Listener
-	sessions                  map[int]*SessionInfo //id is used for closing of channels
 	listenAddr                string
 	nextConnectionId          int
 	sessionClosedChannel      chan int
@@ -22,7 +21,6 @@ func StartFTPServer(listenAddress string) (*FtpServer, error) {
 
 	server := &FtpServer{
 		controlConnectionListener: listener,
-		sessions:                  map[int]*SessionInfo{},
 		listenAddr:                listenAddress,
 		nextConnectionId:          0,
 	}
@@ -46,7 +44,6 @@ func (server *FtpServer) Stop() error {
 func (server *FtpServer) handleConnections() {
 	for {
 		newConnection, err := server.controlConnectionListener.Accept()
-
 		if err != nil {
 			log.Printf("error accepting control connection: %s", err)
 		}
@@ -54,13 +51,14 @@ func (server *FtpServer) handleConnections() {
 		log.Printf("new connection accepted from %s", newConnection.RemoteAddr().String())
 
 		session, err := createSession(&newConnection)
+
+		// this is a main thread for tcp sessions
 		go session.Start()
+
 		if err != nil {
 			log.Printf("error starting session: %s", err)
 		}
 
-		sessionId := server.getSessionId()
-		server.sessions[sessionId] = session
 	}
 }
 

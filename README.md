@@ -35,7 +35,7 @@ Controll connection is opened from client to port `21`.
 After `PASV` command part of response is port to which client should connect.
 Server maybe returns unique port for each connected client?
 
-**How does server paid DTC A control connection**?
+**How does server pair DTC A control connection**?
 
 - one way it to make each DTP unique
   - doesnt work behind nat
