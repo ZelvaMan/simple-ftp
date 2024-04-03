@@ -116,7 +116,7 @@ func (conn *connection) writeLine(msg string) error {
 		return fmt.Errorf("writing flushing connection: %s", err)
 	}
 
-	log.Printf("%d byres written", n)
+	log.Printf("%d byres written: %s", n, msg)
 
 	return nil
 }
