@@ -3,6 +3,7 @@ package ftp
 import (
 	"log"
 	"net"
+	"server/respones"
 )
 
 type SessionInfo struct {
@@ -11,6 +12,7 @@ type SessionInfo struct {
 	cwd               string
 	isLogged          bool
 	username          string
+	commandSequence   string
 }
 
 func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
@@ -21,6 +23,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 		cwd:               "",
 		isLogged:          false,
 		username:          "",
+		commandSequence:   "",
 	}
 
 	return session, nil
@@ -30,8 +33,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 func (session *SessionInfo) Start() {
 	log.Printf("session is starting...")
 
-	err := session.controlConnection.writeLine(formatResponse(220, "zmftp ready for new user"))
-
+	err := session.Respond(respones.Ready())
 	if err != nil {
 		log.Printf("Error sending hello msg: %s", err)
 	}
@@ -40,7 +42,7 @@ func (session *SessionInfo) Start() {
 		line, err := session.controlConnection.readLine()
 
 		if err != nil {
-			log.Printf("control connection read line: %s", err)
+			log.Printf("Error reading line from control connection: %s", err)
 
 			// TODO let server know that session was closed
 			break
@@ -56,12 +58,12 @@ func (session *SessionInfo) Start() {
 			break
 		}
 
-		log.Printf("command handeled")
-
 	}
 
+	log.Printf("Closing connection")
+
 	// close the connection
-	session.controlConnection.close()
+	_ = session.controlConnection.close()
 	session.dataConnection.close()
 }
 
@@ -69,4 +71,9 @@ func (session *SessionInfo) Start() {
 func (session *SessionInfo) Abort() {
 
 	// TODO send abort message
+}
+
+func (session *SessionInfo) Respond(message string) error {
+	log.Printf("Server response: %s", message)
+	return session.controlConnection.writeLine(message)
 }

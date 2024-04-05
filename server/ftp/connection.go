@@ -98,13 +98,13 @@ func (conn *connection) readLine() (string, error) {
 
 	}
 
-	log.Printf("readLine: %s", line)
+	//log.Printf("readLine: %s", line)
 
 	return string(line), nil
 }
 
 func (conn *connection) writeLine(msg string) error {
-	n, err := conn.writer.WriteString(msg + "\n")
+	_, err := conn.writer.WriteString(msg + "\n")
 
 	if err != nil {
 		return fmt.Errorf("writing line to connection: %s", err)
@@ -116,7 +116,7 @@ func (conn *connection) writeLine(msg string) error {
 		return fmt.Errorf("writing flushing connection: %s", err)
 	}
 
-	log.Printf("%d byres written: %s", n, msg)
+	//log.Printf("%d byres written: %s", n, msg)
 
 	return nil
 }
