@@ -5,8 +5,11 @@ import (
 	"log"
 	"server/respones"
 	"server/sequences"
+	"slices"
 	"strings"
 )
+
+var publicCommands = []string{"USER", "PASS"}
 
 func (session *SessionInfo) handleCommand(commandLine string) error {
 
@@ -15,12 +18,41 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		command = commandLine
 	}
 
+	// only allow some commands
+	if !session.isLoggedIn && !slices.Contains(publicCommands, command) {
+		err := session.Respond(respones.NotLoggedIn())
+		if err != nil {
+			return fmt.Errorf("sending not logged in response: %s", err)
+		}
+		return nil
+	}
+
 	var err error
 	switch command {
 	case "USER":
 		err = session.handleUSER(argument)
 	case "PASS":
 		err = session.handlePASS(argument)
+	case "LIST":
+		err = session.handleLIST(argument)
+	case "SYST":
+		err = session.handleSYST()
+	case "FEAT":
+		err = session.handleFEAT()
+	case "PWD":
+		err = session.handlePWD()
+	case "EPSV":
+		log.Printf("Extended passive mode requested")
+		dataConn, err := openPassiveDataConnection()
+		if err != nil {
+			return fmt.Errorf("error opening data connection: %s", err)
+		}
+		// listener started
+		session.dataConnection = dataConn
+
+		log.Printf("Data conneciton listener started, gonna send response")
+		// send port to listened on
+		err = session.Respond(respones.EPSVEnabled(dataConn.address.Port))
 	case "PASV":
 		log.Printf("passive connection requested")
 		dataConn, err := openPassiveDataConnection()
@@ -87,8 +119,69 @@ func (session *SessionInfo) handlePASS(password string) error {
 	}
 
 	// login ok
-	session.isLogged = true
+	session.isLoggedIn = true
 	session.commandSequence = sequences.NONE
 
+	return nil
+}
+
+func (session *SessionInfo) handleLIST(argument string) error {
+	testList := "-rw-------  1 peter         848 Dec 14 11:22 00README.txt \r\n"
+
+	log.Printf("starting the wait for data connection")
+
+	dtc := session.dataConnection.getDataConnection()
+	log.Printf("data connection is ready")
+
+	// notify client that we will stand sending response
+	err := session.Respond(respones.ListSendingResponse())
+	if err != nil {
+		return err
+	}
+
+	err = dtc.write(testList)
+	if err != nil {
+		return err
+	}
+	log.Printf("data written to data connection")
+
+	// TODO this isnt always the case
+	err = dtc.close()
+	if err != nil {
+		return err
+	}
+	// acnowledge that all data was send
+	err = session.Respond(respones.ListOk())
+	return err
+}
+
+func (session *SessionInfo) handleSYST() error {
+	err := session.Respond(respones.ServerSystem())
+	if err != nil {
+		return fmt.Errorf("handling syst: %s", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handleFEAT() error {
+	features := []string{}
+
+	err := session.Respond(respones.ListFeatures(features))
+
+	if err != nil {
+		return fmt.Errorf("handling feat: %s", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handlePWD() error {
+	err := session.Respond(respones.SendPWD(session.cwd))
+	if err != nil {
+		return fmt.Errorf("handling pwd: %s", err)
+	}
+
+	log.Printf("returned working directory")
 	return nil
 }

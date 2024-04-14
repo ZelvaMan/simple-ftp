@@ -10,7 +10,7 @@ type SessionInfo struct {
 	controlConnection *connection
 	dataConnection    *dataConnection
 	cwd               string
-	isLogged          bool
+	isLoggedIn        bool
 	username          string
 	commandSequence   string
 }
@@ -20,8 +20,8 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 	session := &SessionInfo{
 		controlConnection: newConnection(controlConnection),
 		dataConnection:    nil,
-		cwd:               "",
-		isLogged:          false,
+		cwd:               "/",
+		isLoggedIn:        false,
 		username:          "",
 		commandSequence:   "",
 	}
@@ -51,7 +51,8 @@ func (session *SessionInfo) Start() {
 
 		log.Printf("line received from control '%s'", line)
 
-		err = session.handleCommand(string(line))
+		// maybe handle if not response have been send
+		err = session.handleCommand(line)
 
 		if err != nil {
 			log.Printf("handling command")
@@ -73,7 +74,8 @@ func (session *SessionInfo) Abort() {
 	// TODO send abort message
 }
 
+// Respond send response on control connection. Adds newline.
 func (session *SessionInfo) Respond(message string) error {
 	log.Printf("Server response: %s", message)
-	return session.controlConnection.writeLine(message)
+	return session.controlConnection.write(message + "\r\n")
 }

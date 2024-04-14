@@ -21,7 +21,7 @@ type dataConnection struct {
 	connection           *connection
 	isReady              bool
 	newConnectionChannel chan *connection
-	address              string
+	address              net.TCPAddr
 }
 
 func newConnection(rawConnection *net.Conn) *connection {
@@ -42,11 +42,12 @@ func newConnection(rawConnection *net.Conn) *connection {
 // when connection is ready, send connection in channel
 func openPassiveDataConnection() (*dataConnection, error) {
 	listener, err := net.Listen("tcp", ":")
-	address := listener.Addr().String()
+	address := *listener.Addr().(*net.TCPAddr)
 	if err != nil {
 		return nil, fmt.Errorf("starting listener for passive data connection: %s", err)
 	}
 
+	log.Printf("data connection listener started")
 	connectionChan := make(chan *connection)
 
 	// in another thread listen to new connection
@@ -54,9 +55,13 @@ func openPassiveDataConnection() (*dataConnection, error) {
 	go func() {
 		for {
 			conn, err := listener.Accept()
+			log.Printf("new connection attemp")
+
 			if err != nil {
 				log.Printf("Error accepting data connection: %s ", err)
 			}
+
+			log.Printf("new connection accepted, sending in channel")
 
 			connectionChan <- newConnection(&conn)
 		}
@@ -78,6 +83,8 @@ func (dataConnection *dataConnection) getDataConnection() *connection {
 
 	if !dataConnection.isReady {
 		// there should be timeout
+		log.Printf("data connection requested but is not ready waiting...")
+		// wait until client connects to data connection
 		dataConnection.connection = <-dataConnection.newConnectionChannel
 		dataConnection.isReady = true
 	}
@@ -103,8 +110,8 @@ func (conn *connection) readLine() (string, error) {
 	return string(line), nil
 }
 
-func (conn *connection) writeLine(msg string) error {
-	_, err := conn.writer.WriteString(msg + "\n")
+func (conn *connection) write(msg string) error {
+	_, err := conn.writer.WriteString(msg)
 
 	if err != nil {
 		return fmt.Errorf("writing line to connection: %s", err)
@@ -113,7 +120,7 @@ func (conn *connection) writeLine(msg string) error {
 	// this can be optimized
 	err = conn.writer.Flush()
 	if err != nil {
-		return fmt.Errorf("writing flushing connection: %s", err)
+		return fmt.Errorf("flushing data to connection: %s", err)
 	}
 
 	//log.Printf("%d byres written: %s", n, msg)
@@ -124,15 +131,15 @@ func (conn *connection) writeLine(msg string) error {
 func (conn *connection) close() error {
 	err := (*conn.rawConnection).Close()
 	if err != nil {
-		return fmt.Errorf("Error closing connection: %s", err)
+		return fmt.Errorf("error closing connection: %s", err)
 	}
 
 	return nil
 }
 
-func (dataConn *dataConnection) FormatAddress() (string, error) {
+func (dataConnection *dataConnection) FormatAddress() (string, error) {
 
-	ipPart, portPart, _ := strings.Cut(dataConn.address, ":")
+	ipPart, portPart, _ := strings.Cut(dataConnection.address.String(), ":")
 
 	parts := make([]string, 0)
 	parts = append(parts, strings.Split(ipPart, ".")...)
