@@ -1,6 +1,7 @@
 package ftp
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"server/respones"
@@ -41,6 +42,8 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleFEAT()
 	case "PWD":
 		err = session.handlePWD()
+	case "TYPE":
+		err = session.handleTYPE(argument)
 	case "EPSV":
 		log.Printf("Extended passive mode requested")
 		dataConn, err := openPassiveDataConnection()
@@ -126,7 +129,7 @@ func (session *SessionInfo) handlePASS(password string) error {
 }
 
 func (session *SessionInfo) handleLIST(argument string) error {
-	testList := "-rw-------  1 peter         848 Dec 14 11:22 00README.txt \r\n"
+	testList := "-rw-------  1 peter         848 Dec 14 11:22 HELLO_WORLD.txt \r\n"
 
 	log.Printf("starting the wait for data connection")
 
@@ -183,5 +186,43 @@ func (session *SessionInfo) handlePWD() error {
 	}
 
 	log.Printf("returned working directory")
+	return nil
+}
+
+func (session *SessionInfo) handleTYPE(params string) error {
+	dataType, dataFormat, hasFormatSet := strings.Cut(params, " ")
+
+	switch dataType {
+	case "A":
+		session.dataType = TYPE_ASCII
+	case "E":
+		session.dataType = TYPE_EBCDIC
+	case "I":
+		session.dataType = TYPE_IMAGE
+	case "L":
+		session.dataType = TYPE_LOCAL
+	default:
+		return errors.New("data type not supported")
+	}
+
+	if hasFormatSet && (session.dataType == TYPE_ASCII || session.dataType == TYPE_EBCDIC) {
+		switch dataFormat {
+		case "N":
+			session.dataFormat = FORMAT_NON_PRINT
+		case "T":
+			session.dataFormat = FORMAT_TELNET
+		case "C":
+			session.dataFormat = FORMAT_ASA
+		default:
+			return errors.New("data format not supported")
+		}
+	}
+
+	err := session.Respond(respones.TypeChanged())
+
+	if err != nil {
+		return fmt.Errorf("error sending response: %s", err)
+	}
+
 	return nil
 }

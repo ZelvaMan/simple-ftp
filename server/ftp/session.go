@@ -6,6 +6,22 @@ import (
 	"server/respones"
 )
 
+const (
+	TYPE_ASCII  DataType = "A"
+	TYPE_EBCDIC DataType = "E"
+	TYPE_IMAGE  DataType = "I"
+	TYPE_LOCAL  DataType = "L"
+)
+
+const (
+	FORMAT_NON_PRINT DataFormat = "N"
+	FORMAT_TELNET    DataFormat = "T"
+	FORMAT_ASA       DataFormat = "C"
+)
+
+type DataType string
+type DataFormat string
+
 type SessionInfo struct {
 	controlConnection *connection
 	dataConnection    *dataConnection
@@ -13,6 +29,8 @@ type SessionInfo struct {
 	isLoggedIn        bool
 	username          string
 	commandSequence   string
+	dataType          DataType
+	dataFormat        DataFormat
 }
 
 func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
@@ -24,6 +42,8 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 		isLoggedIn:        false,
 		username:          "",
 		commandSequence:   "",
+		dataType:          TYPE_ASCII,
+		dataFormat:        FORMAT_NON_PRINT,
 	}
 
 	return session, nil

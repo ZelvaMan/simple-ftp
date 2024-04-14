@@ -74,3 +74,7 @@ func SendPWD(path string) string {
 	return formatResponse(257, msg)
 
 }
+
+func TypeChanged() string {
+	return formatResponse(200, "Data type changed")
+}
