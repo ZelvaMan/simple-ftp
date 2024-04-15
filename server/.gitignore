@@ -1,0 +1,4 @@
+# Build executable
+server
+
+.fuse_hidden*
