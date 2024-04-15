@@ -45,10 +45,10 @@ func (server *FtpServer) handleConnections() {
 	for {
 		newConnection, err := server.controlConnectionListener.Accept()
 		if err != nil {
-			log.Printf("error accepting control connection: %s", err)
+			log.Printf("error accepting control controlConnection: %s", err)
 		}
 
-		log.Printf("new connection accepted from %s", newConnection.RemoteAddr().String())
+		log.Printf("new controlConnection accepted from %s", newConnection.RemoteAddr().String())
 
 		session, err := createSession(&newConnection)
 

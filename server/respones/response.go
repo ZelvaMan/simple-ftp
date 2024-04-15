@@ -75,8 +75,8 @@ func SendPWD(path string) string {
 
 }
 
-func TypeChanged() string {
-	return formatResponse(200, "Data type changed")
+func CommandOkay() string {
+	return formatResponse(200, "Command okay.")
 }
 
 func FileActionOk() string {

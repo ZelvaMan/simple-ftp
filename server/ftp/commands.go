@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"server/ftp/connection"
 	"server/respones"
 	"server/sequences"
 	"slices"
@@ -46,23 +47,25 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleCWD(argument)
 	case "TYPE":
 		err = session.handleTYPE(argument)
+	case "MODE":
+		err = session.handleMODE(argument)
 	case "EPSV":
 		log.Printf("Extended passive mode requested")
-		dataConn, err := openPassiveDataConnection()
+		dataConn, err := connection.OpenPassiveDataConnection()
 		if err != nil {
-			return fmt.Errorf("error opening data connection: %s", err)
+			return fmt.Errorf("error opening data controlConnection: %s", err)
 		}
 		// listener started
 		session.dataConnection = dataConn
 
 		log.Printf("Data conneciton listener started, gonna send response")
 		// send port to listened on
-		err = session.Respond(respones.EPSVEnabled(dataConn.address.Port))
+		err = session.Respond(respones.EPSVEnabled(dataConn.Port()))
 	case "PASV":
-		log.Printf("passive connection requested")
-		dataConn, err := openPassiveDataConnection()
+		log.Printf("passive controlConnection requested")
+		dataConn, err := connection.OpenPassiveDataConnection()
 		if err != nil {
-			return fmt.Errorf("error opening data connection: %s", err)
+			return fmt.Errorf("error opening data controlConnection: %s", err)
 		}
 		// listener started
 		session.dataConnection = dataConn
@@ -142,15 +145,10 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 	var builder strings.Builder
 
 	for _, file := range files {
-		builder.WriteString(fmt.Sprintf("%s\n\n", file.String()))
+		builder.WriteString(fmt.Sprintf("%s\r\n", file.String()))
 	}
 
 	printedList := builder.String()
-
-	log.Printf("starting the wait for data connection")
-
-	dtc := session.dataConnection.getDataConnection()
-	log.Printf("data connection is ready")
 
 	// notify client that we will stand sending response
 	err = session.Respond(respones.ListSendingResponse())
@@ -159,14 +157,24 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 
 	}
 
-	err = dtc.write(printedList)
+	log.Printf("starting the wait for data controlConnection")
+
+	err = session.dataConnection.WaitForDataConnection()
 	if err != nil {
 		return err
 	}
-	log.Printf("data written to data connection")
 
-	// TODO this isnt always the case
-	err = dtc.close()
+	log.Printf("data controlConnection is ready")
+
+	// send data using data connection
+	err = session.dataConnection.SendString(printedList)
+	if err != nil {
+		return err
+	}
+	log.Printf("data written to data controlConnection")
+
+	// TODO this isnt always the case?
+	err = session.dataConnection.Close()
 	if err != nil {
 		return err
 	}
@@ -212,31 +220,31 @@ func (session *SessionInfo) handleTYPE(params string) error {
 
 	switch dataType {
 	case "A":
-		session.dataType = TYPE_ASCII
+		session.dataType = connection.TYPE_ASCII
 	case "E":
-		session.dataType = TYPE_EBCDIC
+		session.dataType = connection.TYPE_EBCDIC
 	case "I":
-		session.dataType = TYPE_IMAGE
+		session.dataType = connection.TYPE_IMAGE
 	case "L":
-		session.dataType = TYPE_LOCAL
+		session.dataType = connection.TYPE_LOCAL
 	default:
 		return errors.New("data type not supported")
 	}
 
-	if hasFormatSet && (session.dataType == TYPE_ASCII || session.dataType == TYPE_EBCDIC) {
+	if hasFormatSet && (session.dataType == connection.TYPE_ASCII || session.dataType == connection.TYPE_EBCDIC) {
 		switch dataFormat {
 		case "N":
-			session.dataFormat = FORMAT_NON_PRINT
+			session.dataFormat = connection.FORMAT_NON_PRINT
 		case "T":
-			session.dataFormat = FORMAT_TELNET
+			session.dataFormat = connection.FORMAT_TELNET
 		case "C":
-			session.dataFormat = FORMAT_ASA
+			session.dataFormat = connection.FORMAT_ASA
 		default:
 			return errors.New("data format not supported")
 		}
 	}
 
-	err := session.Respond(respones.TypeChanged())
+	err := session.Respond(respones.CommandOkay())
 
 	if err != nil {
 		return respondError("type", err)
@@ -254,6 +262,26 @@ func (session *SessionInfo) handleCWD(argument string) error {
 	err := session.Respond(respones.FileActionOk())
 	if err != nil {
 		return respondError("cwd", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handleMODE(argument string) error {
+	switch argument {
+	case "S":
+		session.transmissionMode = connection.MODE_STREAM
+	case "B":
+		session.transmissionMode = connection.MODE_STREAM
+	case "C":
+		session.transmissionMode = connection.MODE_COMPRESSED
+	default:
+		return fmt.Errorf("")
+	}
+
+	err := session.Respond(respones.CommandOkay())
+	if err != nil {
+		return respondError("mode", err)
 	}
 
 	return nil

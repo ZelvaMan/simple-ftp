@@ -5,34 +5,20 @@ import (
 	"net"
 	"server/fs"
 	"server/fs/mapedfs"
+	"server/ftp/connection"
 	"server/respones"
 )
 
-const (
-	TYPE_ASCII  DataType = "A"
-	TYPE_EBCDIC DataType = "E"
-	TYPE_IMAGE  DataType = "I"
-	TYPE_LOCAL  DataType = "L"
-)
-
-const (
-	FORMAT_NON_PRINT DataFormat = "N"
-	FORMAT_TELNET    DataFormat = "T"
-	FORMAT_ASA       DataFormat = "C"
-)
-
-type DataType string
-type DataFormat string
-
 type SessionInfo struct {
-	controlConnection *connection
-	dataConnection    *dataConnection
+	controlConnection *connection.ControlConnection
+	dataConnection    *connection.DataConnection
 	cwd               string
 	isLoggedIn        bool
 	username          string
 	commandSequence   string
-	dataType          DataType
-	dataFormat        DataFormat
+	dataType          connection.DataType
+	dataFormat        connection.DataFormat
+	transmissionMode  connection.TransmissionMode
 	filesystem        fs.Filesystem
 }
 
@@ -44,14 +30,15 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 	}
 
 	session := &SessionInfo{
-		controlConnection: newConnection(controlConnection),
+		controlConnection: connection.NewConnection(controlConnection),
 		dataConnection:    nil,
 		cwd:               "/",
 		isLoggedIn:        false,
 		username:          "",
 		commandSequence:   "",
-		dataType:          TYPE_ASCII,
-		dataFormat:        FORMAT_NON_PRINT,
+		dataType:          connection.TYPE_ASCII,
+		dataFormat:        connection.FORMAT_NON_PRINT,
+		transmissionMode:  connection.MODE_STREAM,
 		filesystem:        filesystem,
 	}
 
@@ -68,10 +55,10 @@ func (session *SessionInfo) Start() {
 	}
 
 	for {
-		line, err := session.controlConnection.readLine()
+		line, err := session.controlConnection.ReceiveLine()
 
 		if err != nil {
-			log.Printf("Error reading line from control connection: %s", err)
+			log.Printf("Error reading line from control controlConnection: %s", err)
 
 			// TODO let server know that session was closed
 			break
@@ -90,11 +77,11 @@ func (session *SessionInfo) Start() {
 
 	}
 
-	log.Printf("Closing connection")
+	log.Printf("Closing controlConnection")
 
-	// close the connection
-	_ = session.controlConnection.close()
-	session.dataConnection.close()
+	// close the controlConnection
+	_ = session.controlConnection.Close()
+	_ = session.dataConnection.Close()
 }
 
 // Abort about session is case of server shutdown
@@ -103,8 +90,8 @@ func (session *SessionInfo) Abort() {
 	// TODO send abort message
 }
 
-// Respond send response on control connection. Adds newline.
+// Respond send response on control controlConnection. Adds newline.
 func (session *SessionInfo) Respond(message string) error {
 	log.Printf("Server response: %s", message)
-	return session.controlConnection.write(message + "\r\n")
+	return session.controlConnection.SendString(message + "\r\n")
 }
