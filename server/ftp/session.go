@@ -3,6 +3,8 @@ package ftp
 import (
 	"log"
 	"net"
+	"server/fs"
+	"server/fs/mapedfs"
 	"server/respones"
 )
 
@@ -31,9 +33,15 @@ type SessionInfo struct {
 	commandSequence   string
 	dataType          DataType
 	dataFormat        DataFormat
+	filesystem        fs.Filesystem
 }
 
 func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
+	// create fs
+	filesystem, err := mapedfs.CreateFS("/home/jrada/git/simple-ftp/test-fs")
+	if err != nil {
+		return nil, err
+	}
 
 	session := &SessionInfo{
 		controlConnection: newConnection(controlConnection),
@@ -44,6 +52,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 		commandSequence:   "",
 		dataType:          TYPE_ASCII,
 		dataFormat:        FORMAT_NON_PRINT,
+		filesystem:        filesystem,
 	}
 
 	return session, nil

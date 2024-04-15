@@ -78,3 +78,7 @@ func SendPWD(path string) string {
 func TypeChanged() string {
 	return formatResponse(200, "Data type changed")
 }
+
+func FileActionOk() string {
+	return formatResponse(250, "Requested file action okay, completed.")
+}

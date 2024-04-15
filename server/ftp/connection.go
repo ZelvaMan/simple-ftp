@@ -79,6 +79,7 @@ func (dataConnection *dataConnection) getDataConnection() *connection {
 	if dataConnection == nil {
 		// no pasv called
 		// TODO handle error
+
 	}
 
 	if !dataConnection.isReady {

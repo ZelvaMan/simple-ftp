@@ -42,6 +42,8 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleFEAT()
 	case "PWD":
 		err = session.handlePWD()
+	case "CWD":
+		err = session.handleCWD(argument)
 	case "TYPE":
 		err = session.handleTYPE(argument)
 	case "EPSV":
@@ -82,7 +84,8 @@ func (session *SessionInfo) handleUSER(username string) error {
 
 	err := session.Respond(respones.PasswordNeeded())
 	if err != nil {
-		return fmt.Errorf("handling USER command: %s", err)
+		return respondError("user", err)
+
 	}
 
 	session.commandSequence = sequences.PASSWORD
@@ -96,7 +99,7 @@ func (session *SessionInfo) handlePASS(password string) error {
 		err := session.Respond(respones.BadSequence())
 
 		if err != nil {
-			return fmt.Errorf("error sending bad sequence: %s", err)
+			return respondError("pass", err)
 		}
 	}
 
@@ -108,7 +111,7 @@ func (session *SessionInfo) handlePASS(password string) error {
 
 		err := session.Respond(respones.NotLoggedIn())
 		if err != nil {
-			return fmt.Errorf("error sending not logged in: %s", err)
+			return respondError("pass", err)
 		}
 
 		return nil
@@ -118,7 +121,8 @@ func (session *SessionInfo) handlePASS(password string) error {
 
 	err := session.Respond(respones.UserLoggedIn())
 	if err != nil {
-		return fmt.Errorf("error sending logged in: %s", err)
+		return respondError("pass", err)
+
 	}
 
 	// login ok
@@ -128,8 +132,20 @@ func (session *SessionInfo) handlePASS(password string) error {
 	return nil
 }
 
-func (session *SessionInfo) handleLIST(argument string) error {
-	testList := "-rw-------  1 peter         848 Dec 14 11:22 HELLO_WORLD.txt \r\n"
+func (session *SessionInfo) handleLIST(requestedPath string) error {
+	// if no path is specified, use cwd
+	if requestedPath == "" {
+		requestedPath = session.cwd
+	}
+	files, err := session.filesystem.List(requestedPath)
+
+	var builder strings.Builder
+
+	for _, file := range files {
+		builder.WriteString(fmt.Sprintf("%s\n\n", file.String()))
+	}
+
+	printedList := builder.String()
 
 	log.Printf("starting the wait for data connection")
 
@@ -137,12 +153,13 @@ func (session *SessionInfo) handleLIST(argument string) error {
 	log.Printf("data connection is ready")
 
 	// notify client that we will stand sending response
-	err := session.Respond(respones.ListSendingResponse())
+	err = session.Respond(respones.ListSendingResponse())
 	if err != nil {
-		return err
+		return respondError("list", err)
+
 	}
 
-	err = dtc.write(testList)
+	err = dtc.write(printedList)
 	if err != nil {
 		return err
 	}
@@ -153,7 +170,8 @@ func (session *SessionInfo) handleLIST(argument string) error {
 	if err != nil {
 		return err
 	}
-	// acnowledge that all data was send
+
+	// acknowledge that all data was send
 	err = session.Respond(respones.ListOk())
 	return err
 }
@@ -161,7 +179,7 @@ func (session *SessionInfo) handleLIST(argument string) error {
 func (session *SessionInfo) handleSYST() error {
 	err := session.Respond(respones.ServerSystem())
 	if err != nil {
-		return fmt.Errorf("handling syst: %s", err)
+		return respondError("syst", err)
 	}
 
 	return nil
@@ -173,7 +191,7 @@ func (session *SessionInfo) handleFEAT() error {
 	err := session.Respond(respones.ListFeatures(features))
 
 	if err != nil {
-		return fmt.Errorf("handling feat: %s", err)
+		return respondError("feat", err)
 	}
 
 	return nil
@@ -182,7 +200,7 @@ func (session *SessionInfo) handleFEAT() error {
 func (session *SessionInfo) handlePWD() error {
 	err := session.Respond(respones.SendPWD(session.cwd))
 	if err != nil {
-		return fmt.Errorf("handling pwd: %s", err)
+		return respondError("pwd", err)
 	}
 
 	log.Printf("returned working directory")
@@ -221,7 +239,21 @@ func (session *SessionInfo) handleTYPE(params string) error {
 	err := session.Respond(respones.TypeChanged())
 
 	if err != nil {
-		return fmt.Errorf("error sending response: %s", err)
+		return respondError("type", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handleCWD(argument string) error {
+	// TODO do some validation
+	session.cwd = argument
+
+	log.Printf("CWD changed to %s", session.cwd)
+
+	err := session.Respond(respones.FileActionOk())
+	if err != nil {
+		return respondError("cwd", err)
 	}
 
 	return nil
