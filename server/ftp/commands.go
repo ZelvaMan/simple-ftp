@@ -49,6 +49,8 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleTYPE(argument)
 	case "MODE":
 		err = session.handleMODE(argument)
+	case "RETR":
+		err = session.handleRETR(argument)
 	case "EPSV":
 		log.Printf("Extended passive mode requested")
 		dataConn, err := connection.OpenPassiveDataConnection()
@@ -151,7 +153,7 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 	printedList := builder.String()
 
 	// notify client that we will stand sending response
-	err = session.Respond(respones.ListSendingResponse())
+	err = session.Respond(respones.SendingResponse())
 	if err != nil {
 		return respondError("list", err)
 
@@ -282,6 +284,31 @@ func (session *SessionInfo) handleMODE(argument string) error {
 	err := session.Respond(respones.CommandOkay())
 	if err != nil {
 		return respondError("mode", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handleRETR(argumnet string) error {
+
+	fileReader, err := session.filesystem.Retrieve(argumnet)
+	if err != nil {
+		return fmt.Errorf("retrieving file from fs: %s", err)
+	}
+	log.Printf("filereader retrieved, sending file...")
+	err = session.Respond(respones.SendingResponse())
+	if err != nil {
+		return respondError("retr", err)
+	}
+
+	err = session.dataConnection.Send(session.transmissionMode, fileReader, nil)
+	if err != nil {
+		return fmt.Errorf("sending file: %s", err)
+	}
+
+	err = session.Respond(respones.DataSendClosingConnection())
+	if err != nil {
+		return respondError("retr", err)
 	}
 
 	return nil

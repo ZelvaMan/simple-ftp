@@ -61,8 +61,8 @@ func ListOk() string {
 	return formatResponse(226, "Directory listing ok")
 }
 
-func ListSendingResponse() string {
-	return formatResponse(150, "Here comes the directory listing")
+func SendingResponse() string {
+	return formatResponse(150, "Here comes the data")
 }
 
 func NotAllowed() string {
@@ -81,4 +81,8 @@ func CommandOkay() string {
 
 func FileActionOk() string {
 	return formatResponse(250, "Requested file action okay, completed.")
+}
+
+func DataSendClosingConnection() string {
+	return formatResponse(226, "Data send, now closing connection")
 }

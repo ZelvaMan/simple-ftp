@@ -57,8 +57,16 @@ func (mfs *MappedFS) List(directory string) ([]fs.File, error) {
 
 }
 
-func (*MappedFS) Retrieve(path string) (io.Reader, error) {
-	return nil, nil
+func (mfs *MappedFS) Retrieve(path string) (io.Reader, error) {
+	realPath := mfs.resolveMappedToReal(path)
+
+	file, err := os.Open(realPath)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve file %s:%s", path, err)
+	}
+
+	log.Printf("got file reader")
+	return file, nil
 }
 
 func (mfs *MappedFS) resolveMappedToReal(relativePath string) string {

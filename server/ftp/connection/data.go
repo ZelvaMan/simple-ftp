@@ -99,8 +99,16 @@ func (dataConnection *DataConnection) Port() int {
 }
 
 func (dataConnection *DataConnection) Close() error {
+	var err error
 
-	err := (*dataConnection.connection).Close()
+	if dataConnection.isReady {
+		err = (*dataConnection.connection).Close()
+	}
+	dataConnection.isReady = false
+	dataConnection.reader = nil
+	dataConnection.writer = nil
+	dataConnection.connection = nil
+
 	if err != nil {
 		return err
 	}
@@ -125,12 +133,6 @@ func (dataConnection *DataConnection) SendString(text string) error {
 	return nil
 }
 
-func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.Reader, cancel chan bool) error {
-	// TODO think about cancelation
-
-	return nil
-}
-
 func (dataConnection *DataConnection) WaitForDataConnection() error {
 	if dataConnection == nil {
 		return fmt.Errorf("no data connection listener started, you need to first send EPSV or PASV")
@@ -148,5 +150,34 @@ func (dataConnection *DataConnection) WaitForDataConnection() error {
 		dataConnection.isReady = true
 	}
 
+	return nil
+}
+
+func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.Reader, cancel chan bool) error {
+	err := dataConnection.WaitForDataConnection()
+	if err != nil {
+		return fmt.Errorf("waiting for data connection: %s", err)
+	}
+
+	// TODO think about cancelation
+	switch mode {
+	case MODE_STREAM:
+		log.Printf("start sending data")
+		_, err := io.Copy(dataConnection.writer, dataReader)
+		if err != nil {
+			return fmt.Errorf("copy data from filereader to socker: %s", err)
+		}
+		// TODO maybe flush more often
+		err = dataConnection.writer.Flush()
+		if err != nil {
+			return fmt.Errorf("flushing DTC after copy: %s", err)
+		}
+
+		err = dataConnection.Close()
+		if err != nil {
+			return fmt.Errorf("closing DTC after finished transfer: %s", err)
+		}
+
+	}
 	return nil
 }
