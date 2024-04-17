@@ -62,8 +62,9 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		session.RespondOrPanic(respones.NotImplemented())
 	}
 
+	// unrecoverable error while processing command
 	if err != nil {
-		return fmt.Errorf("handling command: %s", err)
+		return fmt.Errorf("unrecoverable error while handling command: %s", err)
 	}
 
 	return nil
@@ -130,12 +131,12 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 	log.Printf("data written to data controlConnection")
 
 	// acknowledge that all data was send
-	session.RespondOrPanic(respones.ListOk())
+	session.RespondOrPanic(respones.FileActionOk())
 	return nil
 }
 
 func (session *SessionInfo) handleSYST() error {
-	session.RespondOrPanic(respones.ServerSystem())
+	session.RespondOrPanic(respones.System())
 
 	return nil
 }

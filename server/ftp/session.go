@@ -60,7 +60,7 @@ func (session *SessionInfo) Start() {
 
 	log.Printf("session is starting...")
 
-	session.RespondOrPanic(respones.Ready())
+	session.RespondOrPanic(respones.ServerReady())
 
 	for {
 		line, err := session.controlConnection.ReceiveLine()

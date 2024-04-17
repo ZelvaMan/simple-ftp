@@ -21,7 +21,7 @@ func PasswordNeeded() string {
 func BadSequence() string {
 	return formatResponse(503, "Bad sequence of commands.")
 }
-func Ready() string {
+func ServerReady() string {
 	return formatResponse(220, "zmftp ready for new user.")
 }
 
@@ -33,7 +33,7 @@ func NotImplemented() string {
 	return formatResponse(502, "Command not implemented.")
 }
 
-func ServerSystem() string {
+func System() string {
 	return formatResponse(215, "Zelvaman ultimate server")
 }
 
@@ -55,10 +55,6 @@ func ListFeatures(features []string) string {
 func EPSVEnabled(portNumber int) string {
 	message := fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", portNumber)
 	return formatResponse(229, message)
-}
-
-func ListOk() string {
-	return formatResponse(226, "Directory listing ok")
 }
 
 func SendingResponse() string {
