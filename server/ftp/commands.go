@@ -150,7 +150,7 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 		builder.WriteString(fmt.Sprintf("%s\r\n", file.String()))
 	}
 
-	printedList := builder.String()
+	printListReader := strings.NewReader(builder.String())
 
 	// notify client that we will stand sending response
 	err = session.Respond(respones.SendingResponse())
@@ -159,27 +159,12 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 
 	}
 
-	log.Printf("starting the wait for data controlConnection")
-
-	err = session.dataConnection.WaitForDataConnection()
-	if err != nil {
-		return err
-	}
-
-	log.Printf("data controlConnection is ready")
-
 	// send data using data connection
-	err = session.dataConnection.SendString(printedList)
+	err = session.dataConnection.Send(session.transmissionMode, printListReader, nil)
 	if err != nil {
 		return err
 	}
 	log.Printf("data written to data controlConnection")
-
-	// TODO this isnt always the case?
-	err = session.dataConnection.Close()
-	if err != nil {
-		return err
-	}
 
 	// acknowledge that all data was send
 	err = session.Respond(respones.ListOk())
@@ -228,6 +213,7 @@ func (session *SessionInfo) handleTYPE(params string) error {
 	case "I":
 		session.dataType = connection.TYPE_IMAGE
 	case "L":
+		// TODO return some unsupported error
 		session.dataType = connection.TYPE_LOCAL
 	default:
 		return errors.New("data type not supported")

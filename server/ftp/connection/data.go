@@ -116,23 +116,6 @@ func (dataConnection *DataConnection) Close() error {
 	return nil
 }
 
-func (dataConnection *DataConnection) SendString(text string) error {
-	log.Printf("Sending string down the dtc length: %d", len(text))
-	_, err := dataConnection.writer.WriteString(text)
-	if err != nil {
-		return err
-	}
-
-	err = dataConnection.writer.Flush()
-	if err != nil {
-		return err
-	}
-
-	log.Printf("data send")
-
-	return nil
-}
-
 func (dataConnection *DataConnection) WaitForDataConnection() error {
 	if dataConnection == nil {
 		return fmt.Errorf("no data connection listener started, you need to first send EPSV or PASV")
@@ -146,7 +129,6 @@ func (dataConnection *DataConnection) WaitForDataConnection() error {
 
 		dataConnection.reader = bufio.NewReader(*dataConnection.connection)
 		dataConnection.writer = bufio.NewWriter(*dataConnection.connection)
-
 		dataConnection.isReady = true
 	}
 
@@ -154,6 +136,7 @@ func (dataConnection *DataConnection) WaitForDataConnection() error {
 }
 
 func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.Reader, cancel chan bool) error {
+	// ensure that data connection exists and is ready
 	err := dataConnection.WaitForDataConnection()
 	if err != nil {
 		return fmt.Errorf("waiting for data connection: %s", err)
