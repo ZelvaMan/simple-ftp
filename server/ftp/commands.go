@@ -14,7 +14,9 @@ import (
 
 var publicCommands = []string{"USER", "PASS"}
 
+// handleCommand returned error means, that session is in irrecoverable state and we have to close it
 func (session *SessionInfo) handleCommand(commandLine string) error {
+	log.Printf("Received command '%s'", commandLine)
 
 	command, argument, hasArguments := strings.Cut(commandLine, " ")
 	if !hasArguments {
@@ -23,10 +25,8 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 
 	// only allow some commands
 	if !session.isLoggedIn && !slices.Contains(publicCommands, command) {
-		err := session.Respond(respones.NotLoggedIn())
-		if err != nil {
-			return fmt.Errorf("sending not logged in response: %s", err)
-		}
+		session.RespondOrPanic(respones.NotLoggedIn())
+
 		return nil
 	}
 
@@ -59,7 +59,7 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 	default:
 		log.Printf("Command %s is not implemented", command)
 
-		err = session.Respond(respones.NotImplemented())
+		session.RespondOrPanic(respones.NotImplemented())
 	}
 
 	if err != nil {
@@ -72,11 +72,7 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 func (session *SessionInfo) handleUSER(username string) error {
 	session.username = username
 
-	err := session.Respond(respones.PasswordNeeded())
-	if err != nil {
-		return respondError("user", err)
-
-	}
+	session.RespondOrPanic(respones.PasswordNeeded())
 
 	session.commandSequence = sequences.PASSWORD
 	return nil
@@ -86,11 +82,8 @@ func (session *SessionInfo) handlePASS(password string) error {
 	// check sequence
 	if session.commandSequence != sequences.PASSWORD {
 		log.Printf("wrong sequence")
-		err := session.Respond(respones.BadSequence())
 
-		if err != nil {
-			return respondError("pass", err)
-		}
+		session.RespondOrPanic(respones.BadSequence())
 	}
 
 	log.Printf("trying to authenticate user %s", session.username)
@@ -99,21 +92,14 @@ func (session *SessionInfo) handlePASS(password string) error {
 	if !authenticateUser(session.username, password) {
 		log.Printf("Wrong user name or pasword")
 
-		err := session.Respond(respones.NotLoggedIn())
-		if err != nil {
-			return respondError("pass", err)
-		}
+		session.RespondOrPanic(respones.NotLoggedIn())
 
 		return nil
 	}
 
 	log.Printf("user authenticated")
 
-	err := session.Respond(respones.UserLoggedIn())
-	if err != nil {
-		return respondError("pass", err)
-
-	}
+	session.RespondOrPanic(respones.UserLoggedIn())
 
 	// login ok
 	session.isLoggedIn = true
@@ -127,21 +113,14 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 	joinedPath := filepath.Join(session.cwd, requestedPath)
 
 	files, err := session.filesystem.List(joinedPath)
+	if err != nil {
 
-	var builder strings.Builder
-
-	for _, file := range files {
-		builder.WriteString(fmt.Sprintf("%s\r\n", file.String()))
 	}
 
-	printListReader := strings.NewReader(builder.String())
+	printListReader := strings.NewReader(files.String())
 
 	// notify client that we will stand sending response
-	err = session.Respond(respones.SendingResponse())
-	if err != nil {
-		return respondError("list", err)
-
-	}
+	session.RespondOrPanic(respones.SendingResponse())
 
 	// send data using data connection
 	err = session.dataConnection.Send(session.transmissionMode, printListReader, nil)
@@ -151,15 +130,12 @@ func (session *SessionInfo) handleLIST(requestedPath string) error {
 	log.Printf("data written to data controlConnection")
 
 	// acknowledge that all data was send
-	err = session.Respond(respones.ListOk())
-	return err
+	session.RespondOrPanic(respones.ListOk())
+	return nil
 }
 
 func (session *SessionInfo) handleSYST() error {
-	err := session.Respond(respones.ServerSystem())
-	if err != nil {
-		return respondError("syst", err)
-	}
+	session.RespondOrPanic(respones.ServerSystem())
 
 	return nil
 }
@@ -167,20 +143,13 @@ func (session *SessionInfo) handleSYST() error {
 func (session *SessionInfo) handleFEAT() error {
 	features := []string{}
 
-	err := session.Respond(respones.ListFeatures(features))
-
-	if err != nil {
-		return respondError("feat", err)
-	}
+	session.RespondOrPanic(respones.ListFeatures(features))
 
 	return nil
 }
 
 func (session *SessionInfo) handlePWD() error {
-	err := session.Respond(respones.SendPWD(session.cwd))
-	if err != nil {
-		return respondError("pwd", err)
-	}
+	session.RespondOrPanic(respones.SendPWD(session.cwd))
 
 	log.Printf("returned working directory")
 	return nil
@@ -216,11 +185,7 @@ func (session *SessionInfo) handleTYPE(params string) error {
 		}
 	}
 
-	err := session.Respond(respones.CommandOkay())
-
-	if err != nil {
-		return respondError("type", err)
-	}
+	session.RespondOrPanic(respones.CommandOkay())
 
 	return nil
 }
@@ -231,10 +196,7 @@ func (session *SessionInfo) handleCWD(argument string) error {
 
 	log.Printf("CWD changed to %s", session.cwd)
 
-	err := session.Respond(respones.FileActionOk())
-	if err != nil {
-		return respondError("cwd", err)
-	}
+	session.RespondOrPanic(respones.FileActionOk())
 
 	return nil
 }
@@ -251,10 +213,7 @@ func (session *SessionInfo) handleMODE(argument string) error {
 		return fmt.Errorf("")
 	}
 
-	err := session.Respond(respones.CommandOkay())
-	if err != nil {
-		return respondError("mode", err)
-	}
+	session.RespondOrPanic(respones.CommandOkay())
 
 	return nil
 }
@@ -267,20 +226,14 @@ func (session *SessionInfo) handleRETR(requestedPath string) error {
 		return fmt.Errorf("retrieving file from fs: %s", err)
 	}
 	log.Printf("filereader retrieved, sending file...")
-	err = session.Respond(respones.SendingResponse())
-	if err != nil {
-		return respondError("retr", err)
-	}
+	session.RespondOrPanic(respones.SendingResponse())
 
 	err = session.dataConnection.Send(session.transmissionMode, fileReader, nil)
 	if err != nil {
 		return fmt.Errorf("sending file: %s", err)
 	}
 
-	err = session.Respond(respones.DataSendClosingConnection())
-	if err != nil {
-		return respondError("retr", err)
-	}
+	session.RespondOrPanic(respones.DataSendClosingConnection())
 
 	return nil
 }
@@ -308,10 +261,7 @@ func (session *SessionInfo) handleEPSV() error {
 
 	log.Printf("Data conneciton listener started")
 	// send port to listened on
-	err = session.Respond(respones.EPSVEnabled(dataConn.Port()))
-	if err != nil {
-		return respondError("EPSV", err)
-	}
+	session.RespondOrPanic(respones.EPSVEnabled(dataConn.Port()))
 
 	return nil
 }

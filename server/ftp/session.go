@@ -47,25 +47,29 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 }
 
 func (session *SessionInfo) Start() {
+	defer func() {
+		// captures irrecoverable error, like send
+		if err := recover(); err != nil {
+			log.Println("PANIC: panic occurred in session :", err)
+		}
+
+		// ensure the connection are closed
+		_ = session.controlConnection.Close()
+		_ = session.dataConnection.Close()
+	}()
+
 	log.Printf("session is starting...")
 
-	err := session.Respond(respones.Ready())
-	if err != nil {
-		log.Printf("Error sending hello msg: %s", err)
-	}
+	session.RespondOrPanic(respones.Ready())
 
 	for {
 		line, err := session.controlConnection.ReceiveLine()
 
 		if err != nil {
 			log.Printf("Error reading line from control controlConnection: %s", err)
-
-			// TODO let server know that session was closed
 			break
 
 		}
-
-		log.Printf("line received from control '%s'", line)
 
 		// maybe handle if not response have been send
 		err = session.handleCommand(line)
@@ -76,13 +80,6 @@ func (session *SessionInfo) Start() {
 		}
 
 	}
-
-	log.Printf("Closing controlConnection")
-
-	// close the controlConnection
-	_ = session.controlConnection.Close()
-
-	_ = session.dataConnection.Close()
 }
 
 // Abort about session is case of server shutdown
@@ -93,6 +90,20 @@ func (session *SessionInfo) Abort() {
 
 // Respond send response on control controlConnection. Adds newline.
 func (session *SessionInfo) Respond(message string) error {
+	// TODO maybe panic in case of error.
+	// error in sending data in unrecoverable condition, that will force termination of session.
+	// I am not sure if this is okay practice
+
 	log.Printf("Server response: %s", message)
 	return session.controlConnection.SendString(message + "\r\n")
+
+}
+
+// RespondOrPanic wrapper around Respond that panics on error
+func (session *SessionInfo) RespondOrPanic(message string) {
+
+	err := session.Respond(message)
+	if err != nil {
+		panic(err)
+	}
 }

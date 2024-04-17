@@ -5,6 +5,6 @@ import (
 )
 
 type Filesystem interface {
-	List(directory string) ([]File, error)
+	List(directory string) (FileList, error)
 	Retrieve(path string) (io.Reader, error)
 }

@@ -155,7 +155,7 @@ func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.
 		if err != nil {
 			return fmt.Errorf("copy data from filereader to socker: %s", err)
 		}
-		// TODO maybe flush more often
+
 		err = dataConnection.writer.Flush()
 		if err != nil {
 			return fmt.Errorf("flushing DTC after copy: %s", err)

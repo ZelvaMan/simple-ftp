@@ -86,3 +86,7 @@ func FileActionOk() string {
 func DataSendClosingConnection() string {
 	return formatResponse(226, "Data send, now closing connection")
 }
+
+func GenericError() string {
+	return formatResponse(451, "Action aborted, error in processing")
+}

@@ -21,7 +21,7 @@ func CreateFS(osRoot string) (*MappedFS, error) {
 	return &filesystem, nil
 }
 
-func (mfs *MappedFS) List(directory string) ([]fs.File, error) {
+func (mfs *MappedFS) List(directory string) (fs.FileList, error) {
 	realPath := mfs.resolveMappedToReal(directory)
 
 	entries, err := os.ReadDir(realPath)
