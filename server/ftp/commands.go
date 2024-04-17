@@ -53,25 +53,9 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 	case "RETR":
 		err = session.handleRETR(argument)
 	case "EPSV":
-		log.Printf("Extended passive mode requested")
-		dataConn, err := connection.OpenPassiveDataConnection()
-		if err != nil {
-			return fmt.Errorf("error opening data controlConnection: %s", err)
-		}
-		// listener started
-		session.dataConnection = dataConn
-
-		log.Printf("Data conneciton listener started, gonna send response")
-		// send port to listened on
-		err = session.Respond(respones.EPSVEnabled(dataConn.Port()))
+		err = session.handleEPSV()
 	case "PASV":
-		log.Printf("passive controlConnection requested")
-		dataConn, err := connection.OpenPassiveDataConnection()
-		if err != nil {
-			return fmt.Errorf("error opening data controlConnection: %s", err)
-		}
-		// listener started
-		session.dataConnection = dataConn
+		err = session.handlePASV()
 	default:
 		log.Printf("Command %s is not implemented", command)
 
@@ -296,6 +280,37 @@ func (session *SessionInfo) handleRETR(requestedPath string) error {
 	err = session.Respond(respones.DataSendClosingConnection())
 	if err != nil {
 		return respondError("retr", err)
+	}
+
+	return nil
+}
+
+func (session *SessionInfo) handlePASV() error {
+	log.Printf("passive controlConnection requested")
+	dataConn, err := connection.OpenPassiveDataConnection()
+	if err != nil {
+		return fmt.Errorf("error opening data controlConnection: %s", err)
+	}
+	// listener started
+	session.dataConnection = dataConn
+
+	return nil
+}
+
+func (session *SessionInfo) handleEPSV() error {
+	log.Printf("Extended passive mode requested")
+	dataConn, err := connection.OpenPassiveDataConnection()
+	if err != nil {
+		return fmt.Errorf("error opening data controlConnection: %s", err)
+	}
+	// listener started
+	session.dataConnection = dataConn
+
+	log.Printf("Data conneciton listener started")
+	// send port to listened on
+	err = session.Respond(respones.EPSVEnabled(dataConn.Port()))
+	if err != nil {
+		return respondError("EPSV", err)
 	}
 
 	return nil
