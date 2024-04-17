@@ -46,13 +46,14 @@ type DataConnection struct {
 // when ControlConnection is ready, send ControlConnection in channel
 func OpenPassiveDataConnection() (*DataConnection, error) {
 	listener, err := net.Listen("tcp", ":")
-	address := *listener.Addr().(*net.TCPAddr)
 	if err != nil {
 		return nil, fmt.Errorf("starting listener for passive data ControlConnection: %s", err)
 	}
 
 	log.Printf("data ControlConnection listener started")
 	connectionChan := make(chan *net.Conn)
+
+	address := *listener.Addr().(*net.TCPAddr)
 
 	// in another thread listen to new ControlConnection
 	// in case there is error in ControlConnection we can just abort current command and new ControlConnection will be used for another command
@@ -78,7 +79,7 @@ func OpenPassiveDataConnection() (*DataConnection, error) {
 	}, nil
 }
 
-func (dataConnection *DataConnection) FormatAddress() (string, error) {
+func (dataConnection *DataConnection) FormatAddressForPASV() (string, error) {
 
 	ipPart, portPart, _ := strings.Cut(dataConnection.address.String(), ":")
 

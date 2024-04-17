@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"server/ftp/connection"
 	"server/respones"
 	"server/sequences"
@@ -139,10 +140,9 @@ func (session *SessionInfo) handlePASS(password string) error {
 
 func (session *SessionInfo) handleLIST(requestedPath string) error {
 	// if no path is specified, use cwd
-	if requestedPath == "" {
-		requestedPath = session.cwd
-	}
-	files, err := session.filesystem.List(requestedPath)
+	joinedPath := filepath.Join(session.cwd, requestedPath)
+
+	files, err := session.filesystem.List(joinedPath)
 
 	var builder strings.Builder
 
@@ -275,9 +275,10 @@ func (session *SessionInfo) handleMODE(argument string) error {
 	return nil
 }
 
-func (session *SessionInfo) handleRETR(argumnet string) error {
+func (session *SessionInfo) handleRETR(requestedPath string) error {
+	joinedPath := filepath.Join(session.cwd, requestedPath)
 
-	fileReader, err := session.filesystem.Retrieve(argumnet)
+	fileReader, err := session.filesystem.Retrieve(joinedPath)
 	if err != nil {
 		return fmt.Errorf("retrieving file from fs: %s", err)
 	}
