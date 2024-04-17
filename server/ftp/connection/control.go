@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net"
 )
 
@@ -63,6 +64,11 @@ func (conn *ControlConnection) SendString(msg string) error {
 }
 
 func (conn *ControlConnection) Close() error {
+	if conn == nil {
+		log.Printf("Tried to close connection that was nul")
+		return nil
+	}
+
 	err := (*conn.rawConnection).Close()
 	if err != nil {
 		return fmt.Errorf("error closing ControlConnection: %s", err)

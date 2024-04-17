@@ -81,6 +81,7 @@ func (session *SessionInfo) Start() {
 
 	// close the controlConnection
 	_ = session.controlConnection.Close()
+
 	_ = session.dataConnection.Close()
 }
 

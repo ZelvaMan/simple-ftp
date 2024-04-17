@@ -244,7 +244,7 @@ func (session *SessionInfo) handleMODE(argument string) error {
 	case "S":
 		session.transmissionMode = connection.MODE_STREAM
 	case "B":
-		session.transmissionMode = connection.MODE_STREAM
+		session.transmissionMode = connection.MODE_BLOCK
 	case "C":
 		session.transmissionMode = connection.MODE_COMPRESSED
 	default:

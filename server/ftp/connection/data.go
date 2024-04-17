@@ -100,6 +100,10 @@ func (dataConnection *DataConnection) Port() int {
 }
 
 func (dataConnection *DataConnection) Close() error {
+	if dataConnection == nil {
+		return nil
+	}
+
 	var err error
 
 	if dataConnection.isReady {
