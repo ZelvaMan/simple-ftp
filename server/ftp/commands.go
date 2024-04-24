@@ -1,6 +1,7 @@
 package ftp
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -56,11 +57,15 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleEPSV()
 	case "PASV":
 		err = session.handlePASV()
+	case "STOR":
+		err = session.handleSTOR(argument)
 	default:
 		log.Printf("Command %s is not implemented", command)
 
 		session.RespondOrPanic(respones.NotImplemented())
 	}
+
+	// TODO create custom error struct to separate non recoverable errors
 
 	// unrecoverable error while processing command
 	if err != nil {
@@ -264,5 +269,34 @@ func (session *SessionInfo) handleEPSV() error {
 	// send port to listened on
 	session.RespondOrPanic(respones.EPSVEnabled(dataConn.Port()))
 
+	return nil
+}
+
+func (session *SessionInfo) handleSTOR(destination string) error {
+	// TODO implement
+	session.RespondOrPanic(respones.StartUpload())
+
+	// TODO save to temp file
+	uploadBuffer := new(bytes.Buffer)
+
+	log.Printf("start receiving data...")
+
+	err := session.dataConnection.Receive(session.transmissionMode, uploadBuffer)
+	if err != nil {
+		log.Printf("Error processing ")
+		session.RespondOrPanic(respones.TransferAborted())
+	}
+
+	log.Printf("data received")
+
+	err = session.filesystem.Store(destination, uploadBuffer)
+	if err != nil {
+		log.Printf("Error storing file: %s", err)
+
+		session.RespondOrPanic(respones.GenericError())
+	}
+
+	log.Printf("File saved to fs succesfully")
+	session.RespondOrPanic(respones.FileActionOk())
 	return nil
 }

@@ -69,6 +69,34 @@ func (mfs *MappedFS) Retrieve(path string) (io.Reader, error) {
 	return file, nil
 }
 
+func (mfs *MappedFS) Store(path string, data io.Reader) error {
+	realPath := mfs.resolveMappedToReal(path)
+	file, err := os.OpenFile(realPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			log.Printf("Eror closing file: %s", err)
+
+		}
+	}()
+
+	if err != nil {
+		return fmt.Errorf("opening file for writing: %s", err)
+	}
+
+	log.Printf("file opened, starting to copy data")
+	_, err = io.Copy(file, data)
+	if err != nil {
+		return fmt.Errorf("copying from data to file: %s", err)
+	}
+
+	log.Printf("data copied")
+
+	return nil
+
+}
+
 func (mfs *MappedFS) resolveMappedToReal(relativePath string) string {
 	// ensures that file that is not inside osFSRoot is permitted
 	clearedPath := filepath.Clean(relativePath)

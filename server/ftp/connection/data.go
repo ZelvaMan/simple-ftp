@@ -132,6 +132,7 @@ func (dataConnection *DataConnection) WaitForDataConnection() error {
 		// wait until client connects to data ControlConnection
 		dataConnection.connection = <-dataConnection.newConnectionChannel
 
+		// using buffered reader and writer for performance
 		dataConnection.reader = bufio.NewReader(*dataConnection.connection)
 		dataConnection.writer = bufio.NewWriter(*dataConnection.connection)
 		dataConnection.isReady = true
@@ -167,5 +168,35 @@ func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.
 		}
 
 	}
+	return nil
+}
+
+func (dataConnection *DataConnection) Receive(mode TransmissionMode, dataWriter io.Writer) error {
+	log.Printf("waiting for data connection to receive data from client")
+
+	// ensure that data connection exists and is ready
+	err := dataConnection.WaitForDataConnection()
+	if err != nil {
+		return fmt.Errorf("waiting for data connection: %s", err)
+	}
+
+	switch mode {
+	case MODE_STREAM:
+
+		log.Printf("start receiving data form client in stream mode")
+		// TODO handle timeout
+		// TODO handle file size limit
+		_, err := dataConnection.reader.WriteTo(dataWriter)
+
+		if err != nil {
+			return fmt.Errorf("copying data from socket to file: %s", err)
+		}
+
+		err = dataConnection.Close()
+		if err != nil {
+			return fmt.Errorf("closing DTC after finished transfer: %s", err)
+		}
+	}
+
 	return nil
 }

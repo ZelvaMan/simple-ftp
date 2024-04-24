@@ -86,3 +86,11 @@ func DataSendClosingConnection() string {
 func GenericError() string {
 	return formatResponse(451, "Action aborted, error in processing")
 }
+
+func StartUpload() string {
+	return formatResponse(150, "You can start uploading now")
+}
+
+func TransferAborted() string {
+	return formatResponse(426, "Connection closed, transfer aborted")
+}
