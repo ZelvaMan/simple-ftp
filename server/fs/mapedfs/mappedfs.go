@@ -1,6 +1,7 @@
 package mapedfs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -61,11 +62,14 @@ func (mfs *MappedFS) Retrieve(path string) (io.Reader, error) {
 	realPath := mfs.resolveMappedToReal(path)
 
 	file, err := os.Open(realPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, fs.NewNotFoundError(path)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("retrieve file %s:%s", path, err)
 	}
 
-	log.Printf("got file reader")
+	log.Printf("File reader received for file %s(%s)", path, realPath)
 	return file, nil
 }
 

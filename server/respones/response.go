@@ -94,3 +94,10 @@ func StartUpload() string {
 func TransferAborted() string {
 	return formatResponse(426, "Connection closed, transfer aborted")
 }
+func ClosingControlConnection() string {
+	return formatResponse(221, "Closing control connection, Goodbye")
+}
+
+func FileUnavailable(path string) string {
+	return formatResponse(550, fmt.Sprintf("File %s doesnt exist", path))
+}

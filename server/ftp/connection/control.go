@@ -6,7 +6,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"slices"
 )
+
+const TELNET_IAC = 255 // interrupt as command
+const TELNET_IP = 244
+const TELNET_DATA_MARK = 242
 
 type ControlConnection struct {
 	rawConnection *net.Conn
@@ -42,7 +47,30 @@ func (conn *ControlConnection) ReceiveLine() (string, error) {
 
 	//log.Printf("ReceiveLine: %s", line)
 
-	return string(line), nil
+	return dataToCommand(line), nil
+}
+
+var bytesToSkip = []byte{TELNET_IAC, TELNET_IP, TELNET_DATA_MARK}
+
+func dataToCommand(data []byte) string {
+	dataStartIdx := 0
+
+	// it is just raw data
+	if len(data) >= 2 && data[0] == TELNET_IAC {
+
+		// TELNET Command has to be at least 2 bytes long
+		dataStartIdx = 2
+
+		// skip all control bytes
+		// maybe only skip if first byte is IAC?
+		if dataStartIdx < len(bytesToSkip) && slices.Contains(bytesToSkip, data[dataStartIdx]) {
+			dataStartIdx++
+		}
+
+		log.Printf("command line has telnet control sequence, skipping %d bytes", dataStartIdx)
+	}
+
+	return string(data[dataStartIdx:])
 }
 
 func (conn *ControlConnection) SendString(msg string) error {

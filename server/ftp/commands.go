@@ -31,6 +31,24 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		return nil
 	}
 
+	if session.command.IsRunning() {
+		log.Printf("trying to handle command while another is running, %s", commandLine)
+
+		switch command {
+		case "ABOR":
+
+			_ = session.handleABOR()
+
+		default:
+			// TODO use better error
+
+			// better way would be to place command in some queue to be processed later
+			session.RespondOrPanic(respones.BadSequence())
+		}
+
+		return nil
+	}
+
 	var err error
 	switch command {
 	case "USER":
@@ -59,6 +77,10 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handlePASV()
 	case "STOR":
 		err = session.handleSTOR(argument)
+	case "QUIT":
+		err = session.handleQUIT()
+	case "ABOR":
+		err = session.handleABOR()
 	default:
 		log.Printf("Command %s is not implemented", command)
 
@@ -147,7 +169,7 @@ func (session *SessionInfo) handleSYST() error {
 }
 
 func (session *SessionInfo) handleFEAT() error {
-	features := []string{}
+	features := []string{"SIZE"}
 
 	session.RespondOrPanic(respones.ListFeatures(features))
 
@@ -225,21 +247,45 @@ func (session *SessionInfo) handleMODE(argument string) error {
 }
 
 func (session *SessionInfo) handleRETR(requestedPath string) error {
+	// TODO handle resume
+
 	joinedPath := filepath.Join(session.cwd, requestedPath)
 
-	fileReader, err := session.filesystem.Retrieve(joinedPath)
-	if err != nil {
-		return fmt.Errorf("retrieving file from fs: %s", err)
-	}
-	log.Printf("filereader retrieved, sending file...")
-	session.RespondOrPanic(respones.SendingResponse())
+	// if command would not close, session would be locked until abort is issued
+	session.command.Start()
 
-	err = session.dataConnection.Send(session.transmissionMode, fileReader, nil)
-	if err != nil {
-		return fmt.Errorf("sending file: %s", err)
-	}
+	go func() {
 
-	session.RespondOrPanic(respones.DataSendClosingConnection())
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("PANIC: runing goroutine for sending file: %s", err)
+			}
+			log.Printf("async task defer")
+			// TODO maybe abort whole session
+			session.command.Finish()
+		}()
+
+		fileReader, err := session.filesystem.Retrieve(joinedPath)
+		if err != nil {
+			log.Printf("Error getting reader for file: %s", err)
+			session.RespondOrPanic(respones.FileUnavailable(requestedPath))
+			return
+		}
+
+		log.Printf("filereader retrieved, sending file...")
+
+		session.RespondOrPanic(respones.SendingResponse())
+
+		err = session.dataConnection.Send(session.transmissionMode, fileReader, session.command.AbortChan)
+		if err != nil {
+			log.Printf("Error sending file: %s", err)
+			session.RespondOrPanic(respones.GenericError())
+			return
+		}
+
+		session.RespondOrPanic(respones.DataSendClosingConnection())
+
+	}()
 
 	return nil
 }
@@ -298,5 +344,25 @@ func (session *SessionInfo) handleSTOR(destination string) error {
 
 	log.Printf("File saved to fs succesfully")
 	session.RespondOrPanic(respones.FileActionOk())
+	return nil
+}
+
+func (session *SessionInfo) handleQUIT() error {
+	session.RespondOrPanic(respones.ClosingControlConnection())
+
+	return nil
+}
+
+func (session *SessionInfo) handleABOR() error {
+	log.Printf("ABOR command received")
+
+	if session.command.IsRunning() {
+		session.command.Abort()
+
+		session.RespondOrPanic(respones.TransferAborted())
+	}
+
+	session.RespondOrPanic(respones.DataSendClosingConnection())
+
 	return nil
 }

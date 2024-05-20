@@ -5,6 +5,7 @@ import (
 	"net"
 	"server/fs"
 	"server/fs/mapedfs"
+	"server/ftp/commandState"
 	"server/ftp/connection"
 	"server/respones"
 )
@@ -20,6 +21,7 @@ type SessionInfo struct {
 	dataFormat        connection.DataFormat
 	transmissionMode  connection.TransmissionMode
 	filesystem        fs.Filesystem
+	command           *commandState.CommandState
 }
 
 func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
@@ -40,6 +42,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 		dataFormat:        connection.FORMAT_NON_PRINT,
 		transmissionMode:  connection.MODE_STREAM,
 		filesystem:        filesystem,
+		command:           commandState.New(),
 	}
 
 	return session, nil
@@ -48,6 +51,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 
 func (session *SessionInfo) Start() {
 	defer func() {
+		log.Printf("Defer function start")
 		// captures irrecoverable error, like send
 		if err := recover(); err != nil {
 			log.Println("PANIC: panic occurred in session :", err)
@@ -73,9 +77,8 @@ func (session *SessionInfo) Start() {
 
 		// maybe handle if not response have been send
 		err = session.handleCommand(line)
-
 		if err != nil {
-			log.Printf("handling command")
+			log.Printf("error while handling command")
 			break
 		}
 
@@ -90,20 +93,17 @@ func (session *SessionInfo) Abort() {
 
 // Respond send response on control controlConnection. Adds newline.
 func (session *SessionInfo) Respond(message string) error {
-	// TODO maybe panic in case of error.
-	// error in sending data in unrecoverable condition, that will force termination of session.
-	// I am not sure if this is okay practice
-
 	log.Printf("Server response: %s", message)
 	return session.controlConnection.SendString(message + "\r\n")
 
 }
 
-// RespondOrPanic wrapper around Respond that panics on error
+// RespondOrPanic wrapper around Respond that panics on error, because it is unrecoverable error
 func (session *SessionInfo) RespondOrPanic(message string) {
 
 	err := session.Respond(message)
 	if err != nil {
+		log.Printf("PANIC: error while responding to client: %s", err)
 		panic(err)
 	}
 }

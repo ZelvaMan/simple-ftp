@@ -2,12 +2,14 @@ package connection
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -28,6 +30,8 @@ const (
 	MODE_BLOCK      TransmissionMode = "B"
 	MODE_COMPRESSED TransmissionMode = "C"
 )
+
+const CHUNK_SIZE = 1024
 
 type DataType string
 type DataFormat string
@@ -141,7 +145,7 @@ func (dataConnection *DataConnection) WaitForDataConnection() error {
 	return nil
 }
 
-func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.Reader, cancel chan bool) error {
+func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.Reader, cancelChannel chan bool) error {
 	// ensure that data connection exists and is ready
 	err := dataConnection.WaitForDataConnection()
 	if err != nil {
@@ -151,24 +155,10 @@ func (dataConnection *DataConnection) Send(mode TransmissionMode, dataReader io.
 	// TODO think about cancelation
 	switch mode {
 	case MODE_STREAM:
-		log.Printf("start sending data")
-		_, err := io.Copy(dataConnection.writer, dataReader)
-		if err != nil {
-			return fmt.Errorf("copy data from filereader to socker: %s", err)
-		}
-
-		err = dataConnection.writer.Flush()
-		if err != nil {
-			return fmt.Errorf("flushing DTC after copy: %s", err)
-		}
-
-		err = dataConnection.Close()
-		if err != nil {
-			return fmt.Errorf("closing DTC after finished transfer: %s", err)
-		}
-
+		return dataConnection.sendStreamData(dataReader, cancelChannel)
 	}
-	return nil
+
+	return fmt.Errorf("unsupported mode")
 }
 
 func (dataConnection *DataConnection) Receive(mode TransmissionMode, dataWriter io.Writer) error {
@@ -196,6 +186,62 @@ func (dataConnection *DataConnection) Receive(mode TransmissionMode, dataWriter 
 		if err != nil {
 			return fmt.Errorf("closing DTC after finished transfer: %s", err)
 		}
+	}
+
+	return nil
+}
+
+func (dataConnection *DataConnection) sendStreamData(dataReader io.Reader, cancel chan bool) error {
+
+	log.Printf("start sending dataReader")
+	chunk := 0
+
+	// send dataReader in chunks
+	for {
+		select {
+		case <-cancel:
+			// maybe better way is to just abort the connection
+			return fmt.Errorf("cancelation requested")
+		default:
+		}
+
+		// TODO use read directly to prevent blocking
+		// this works ok, if transmission is slow, if its blocked, abort will not be detected
+		// maybe just set write deadline of connection async, that way we can also just use copy
+		// when we capture we then check if cancel request was send and if so we assume it is the reason for error?
+		writtenSize, err := io.CopyN(dataConnection.writer, dataReader, CHUNK_SIZE)
+		chunk += 1
+
+		//log.Printf("Written chunk %d size: %d",
+		//	chunk, writtenSize)
+
+		// TODO remove
+		time.Sleep(10 * time.Millisecond)
+
+		// finished sending dataReader
+		if errors.Is(err, io.EOF) || writtenSize < CHUNK_SIZE {
+			log.Printf("EOF reached, transfer is ok")
+			break
+		}
+
+		if err != nil {
+			return fmt.Errorf("copy dataReader from filereader to socker: %s", err)
+		}
+
+		err = dataConnection.writer.Flush()
+
+		if err != nil {
+			return fmt.Errorf("flushing DTC after copy: %s", err)
+		}
+
+	}
+
+	log.Printf("finished sending dataReader")
+
+	err := dataConnection.Close()
+
+	if err != nil {
+		return fmt.Errorf("closing DTC after finished transfer: %s", err)
 	}
 
 	return nil
