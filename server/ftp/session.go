@@ -8,6 +8,7 @@ import (
 	"server/ftp/commandState"
 	"server/ftp/connection"
 	"server/respones"
+	"server/sequences"
 )
 
 type SessionInfo struct {
@@ -16,7 +17,7 @@ type SessionInfo struct {
 	cwd               string
 	isLoggedIn        bool
 	username          string
-	commandSequence   string
+	commandSequence   sequences.SequenceInfo
 	dataType          connection.DataType
 	dataFormat        connection.DataFormat
 	transmissionMode  connection.TransmissionMode
@@ -37,7 +38,7 @@ func createSession(controlConnection *net.Conn) (*SessionInfo, error) {
 		cwd:               "/",
 		isLoggedIn:        false,
 		username:          "",
-		commandSequence:   "",
+		commandSequence:   nil,
 		dataType:          connection.TYPE_ASCII,
 		dataFormat:        connection.FORMAT_NON_PRINT,
 		transmissionMode:  connection.MODE_STREAM,

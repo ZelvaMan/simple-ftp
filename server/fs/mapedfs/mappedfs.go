@@ -101,6 +101,33 @@ func (mfs *MappedFS) Store(path string, data io.Reader) error {
 
 }
 
+func (mfs *MappedFS) Exists(path string) (bool, error) {
+	realPath := mfs.resolveMappedToReal(path)
+	_, err := os.Stat(realPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("mapped fs error: %s", err)
+
+}
+
+func (mfs *MappedFS) Rename(from string, to string) error {
+	realFrom := mfs.resolveMappedToReal(from)
+	realTo := mfs.resolveMappedToReal(to)
+
+	err := os.Rename(realFrom, realTo)
+	if err != nil {
+		return fmt.Errorf("mapped fs error: %s", err)
+	}
+
+	log.Printf("MappedOS: file %s renamed to %s", from, to)
+	return nil
+}
+
 func (mfs *MappedFS) resolveMappedToReal(relativePath string) string {
 	// ensures that file that is not inside osFSRoot is permitted
 	clearedPath := filepath.Clean(relativePath)

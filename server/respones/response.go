@@ -101,3 +101,7 @@ func ClosingControlConnection() string {
 func FileUnavailable(path string) string {
 	return formatResponse(550, fmt.Sprintf("File %s doesnt exist", path))
 }
+
+func PendingFurtherAction(nextAction string) string {
+	return formatResponse(350, "Requested file action pending further information.")
+}

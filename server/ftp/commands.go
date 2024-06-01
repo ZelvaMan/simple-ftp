@@ -81,6 +81,10 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleQUIT()
 	case "ABOR":
 		err = session.handleABOR()
+	case "RNFR":
+		err = session.handleRNFR(argument)
+	case "RNTO":
+		err = session.handleRNTO(argument)
 	default:
 		log.Printf("Command %s is not implemented", command)
 
@@ -98,26 +102,27 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 }
 
 func (session *SessionInfo) handleUSER(username string) error {
-	session.username = username
 
 	session.RespondOrPanic(respones.PasswordNeeded())
 
-	session.commandSequence = sequences.PASSWORD
+	session.commandSequence = sequences.NewLoginSequence(username)
 	return nil
 }
 
 func (session *SessionInfo) handlePASS(password string) error {
+	loginSequence, ok := session.commandSequence.(*sequences.LoginSequence)
+
 	// check sequence
-	if session.commandSequence != sequences.PASSWORD {
-		log.Printf("wrong sequence")
+	if !ok {
+		log.Printf("wrong command sequence")
 
 		session.RespondOrPanic(respones.BadSequence())
 	}
 
-	log.Printf("trying to authenticate user %s", session.username)
+	log.Printf("trying to authenticate user %s", loginSequence.Username)
 
 	// wrong password/username
-	if !authenticateUser(session.username, password) {
+	if !authenticateUser(loginSequence.Username, password) {
 		log.Printf("Wrong user name or pasword")
 
 		session.RespondOrPanic(respones.NotLoggedIn())
@@ -130,8 +135,9 @@ func (session *SessionInfo) handlePASS(password string) error {
 	session.RespondOrPanic(respones.UserLoggedIn())
 
 	// login ok
+	session.username = loginSequence.Username
 	session.isLoggedIn = true
-	session.commandSequence = sequences.NONE
+	session.commandSequence = nil
 
 	return nil
 }
@@ -319,7 +325,6 @@ func (session *SessionInfo) handleEPSV() error {
 }
 
 func (session *SessionInfo) handleSTOR(destination string) error {
-	// TODO implement
 	session.RespondOrPanic(respones.StartUpload())
 
 	// TODO save to temp file
@@ -329,7 +334,7 @@ func (session *SessionInfo) handleSTOR(destination string) error {
 
 	err := session.dataConnection.Receive(session.transmissionMode, uploadBuffer)
 	if err != nil {
-		log.Printf("Error processing ")
+		log.Printf("Error processing:  %s", err)
 		session.RespondOrPanic(respones.TransferAborted())
 	}
 
@@ -363,6 +368,53 @@ func (session *SessionInfo) handleABOR() error {
 	}
 
 	session.RespondOrPanic(respones.DataSendClosingConnection())
+
+	return nil
+}
+
+func (session *SessionInfo) handleRNFR(renameFromPath string) error {
+
+	exists, err := session.filesystem.Exists(renameFromPath)
+	if err != nil {
+		log.Printf("fs exists error: %s", err)
+		session.RespondOrPanic(respones.GenericError())
+	}
+
+	// validate path exists
+	if !exists {
+		session.RespondOrPanic(respones.FileUnavailable(renameFromPath))
+		return nil
+	}
+
+	session.commandSequence = sequences.NewRenameSequence(renameFromPath)
+
+	session.RespondOrPanic(respones.PendingFurtherAction("rnto"))
+
+	return nil
+}
+
+func (session *SessionInfo) handleRNTO(renameToPath string) error {
+	renameSequence, ok := session.commandSequence.(*sequences.RenameSequence)
+
+	// check sequence
+	if !ok {
+		log.Printf("wrong command sequence")
+
+		session.RespondOrPanic(respones.BadSequence())
+	}
+
+	err := session.filesystem.Rename(renameSequence.RenameFromPath, renameToPath)
+	if err != nil {
+		log.Printf("Error renaming file: %s", err)
+
+		session.RespondOrPanic(respones.GenericError())
+
+		return nil
+	}
+
+	session.RespondOrPanic(respones.FileActionOk())
+
+	session.commandSequence = nil
 
 	return nil
 }
