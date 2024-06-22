@@ -141,6 +141,19 @@ func (mfs *MappedFS) Delete(deletePath string) error {
 	return nil
 }
 
+func (mfs *MappedFS) CreateDirectory(directory string) error {
+	realPath := mfs.resolveMappedToReal(directory)
+
+	err := os.Mkdir(realPath, 0777)
+	if err != nil {
+		return fmt.Errorf("mapped fs error: %s", err)
+	}
+
+	log.Printf("MappedFS: directory %s created", directory)
+
+	return nil
+}
+
 func (mfs *MappedFS) resolveMappedToReal(relativePath string) string {
 	// ensures that file that is not inside osFSRoot is permitted
 	clearedPath := filepath.Clean(relativePath)

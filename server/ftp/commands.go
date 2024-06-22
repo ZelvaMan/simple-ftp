@@ -87,6 +87,8 @@ func (session *SessionInfo) handleCommand(commandLine string) error {
 		err = session.handleRNTO(argument)
 	case "DELE":
 		err = session.handleDELE(argument)
+	case "MKD":
+		err = session.handleMKD(argument)
 	default:
 		log.Printf("Command %s is not implemented", command)
 
@@ -426,6 +428,22 @@ func (session *SessionInfo) handleDELE(deletePath string) error {
 	err := session.filesystem.Delete(deletePath)
 	if err != nil {
 		log.Printf("Error deleting file: %s", err)
+		session.RespondOrPanic(respones.GenericError())
+
+	}
+
+	session.RespondOrPanic(respones.FileActionOk())
+
+	session.commandSequence = nil
+
+	return nil
+}
+
+func (session *SessionInfo) handleMKD(deletePath string) error {
+
+	err := session.filesystem.CreateDirectory(deletePath)
+	if err != nil {
+		log.Printf("Error creating directory: %s", err)
 		session.RespondOrPanic(respones.GenericError())
 
 	}

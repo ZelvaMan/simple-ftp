@@ -11,4 +11,5 @@ type Filesystem interface {
 	Exists(path string) (bool, error)
 	Rename(oldpath, newpath string) error
 	Delete(deletePath string) error
+	CreateDirectory(path string) error
 }

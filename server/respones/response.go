@@ -66,7 +66,7 @@ func NotAllowed() string {
 }
 
 func SendPWD(path string) string {
-	msg := fmt.Sprintf(" \"%s\" Returning working director", path)
+	msg := fmt.Sprintf("\"%s\" Returning working director", path)
 	return formatResponse(257, msg)
 
 }
