@@ -10,4 +10,5 @@ type Filesystem interface {
 	Store(path string, data io.Reader) error
 	Exists(path string) (bool, error)
 	Rename(oldpath, newpath string) error
+	Delete(deletePath string) error
 }

@@ -128,6 +128,19 @@ func (mfs *MappedFS) Rename(from string, to string) error {
 	return nil
 }
 
+func (mfs *MappedFS) Delete(deletePath string) error {
+	realPath := mfs.resolveMappedToReal(deletePath)
+
+	err := os.Remove(realPath)
+	if err != nil {
+		return fmt.Errorf("mapped fs error: %s", err)
+	}
+
+	log.Printf("MappedFS: file %s deleted", deletePath)
+
+	return nil
+}
+
 func (mfs *MappedFS) resolveMappedToReal(relativePath string) string {
 	// ensures that file that is not inside osFSRoot is permitted
 	clearedPath := filepath.Clean(relativePath)
